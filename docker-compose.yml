@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: pilot-portal-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: pilot-portal
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - pilot-network
+
+  backend:
+    build: ./pilot-portal-backend
+    container_name: pilot-portal-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/pilot-portal
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_EXPIRES_IN=7d
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    volumes:
+      - ./pilot-portal-backend/uploads:/app/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - pilot-network
+
+  frontend:
+    build: ./pilot-portal
+    container_name: pilot-portal-frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - pilot-network
+
+networks:
+  pilot-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
