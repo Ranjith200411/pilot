@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { License, LicenseService, Endorsement } from 'src/app/services/license/license.service';
@@ -7,7 +7,8 @@ import { environment } from 'src/environments/environment';
 @Component({
   selector: 'app-license',
   templateUrl: './license.component.html',
-  styleUrls: ['./license.component.scss']
+  styleUrls: ['./license.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LicenseComponent {
 
@@ -51,7 +52,8 @@ export class LicenseComponent {
   constructor(
     private route: ActivatedRoute,
     private licenseService: LicenseService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -72,6 +74,7 @@ export class LicenseComponent {
       next: (res) => {
         this.license = res.find(l => l.type === this.licenseType);
         this.loading = false;
+        this.cdr.markForCheck();
 
         if (this.license?.documentUrl) {
           this.safePdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
@@ -82,6 +85,7 @@ export class LicenseComponent {
       error: () => {
         this.message = 'Error loading license';
         this.loading = false;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -146,11 +150,13 @@ export class LicenseComponent {
         this.message = 'License saved successfully';
         this.showForm = false;
         this.isSaving = false;
+        this.cdr.markForCheck();
         this.loadLicense();
       },
       error: (err) => {
         this.isSaving = false;
         this.message = err.error?.message || 'Error saving license';
+        this.cdr.markForCheck();
       }
     });
   }
@@ -178,10 +184,12 @@ export class LicenseComponent {
         this.license = updatedLicense;
         this.showEndorsementForm = false;
         this.message = 'Endorsement added successfully';
+        this.cdr.markForCheck();
         this.loadLicense();
       },
       error: (err) => {
         this.message = err.error?.message || 'Error adding endorsement';
+        this.cdr.markForCheck();
       }
     });
   }
@@ -202,10 +210,12 @@ export class LicenseComponent {
         this.license = updatedLicense;
         this.showRatingForm = false;
         this.message = 'Rating added successfully';
+        this.cdr.markForCheck();
         this.loadLicense();
       },
       error: (err) => {
         this.message = err.error?.message || 'Error adding rating';
+        this.cdr.markForCheck();
       }
     });
   }
@@ -216,10 +226,12 @@ export class LicenseComponent {
     this.licenseService.removeEndorsement(this.license._id, endorsementId).subscribe({
       next: () => {
         this.message = 'Endorsement removed';
+        this.cdr.markForCheck();
         this.loadLicense();
       },
       error: (err) => {
         this.message = err.error?.message || 'Error removing endorsement';
+        this.cdr.markForCheck();
       }
     });
   }

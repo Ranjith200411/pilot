@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Medical, MedicalsService } from 'src/app/services/medicals/medicals.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -8,11 +8,12 @@ import { environment } from 'src/environments/environment';
 @Component({
   selector: 'app-medicals',
   templateUrl: './medicals.component.html',
-  styleUrls: ['./medicals.component.scss']
+  styleUrls: ['./medicals.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MedicalsComponent {
   
-  classType!: 'Class 1' | 'Class 2';
+  classType!: 'Class 1' | 'Class 2' | 'Class 3';
 
   medical?: Medical;
   loading = true;
@@ -22,6 +23,7 @@ export class MedicalsComponent {
   isSaving = false;
 
   reminderOptions = [90, 60, 45, 30, 14, 7];
+  quickReminderOptions = [45, 30, 14];
 
   showPreview = false;
   safePdfUrl?: SafeResourceUrl;
@@ -29,15 +31,19 @@ export class MedicalsComponent {
 
   form: Partial<Medical> = {};
 
-  constructor(private route:ActivatedRoute,private medicalService: MedicalsService,private sanitizer: DomSanitizer) {}
+  constructor(private route: ActivatedRoute, private medicalService: MedicalsService, private sanitizer: DomSanitizer, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
     this.route.paramMap.subscribe(params => {
       const type = params.get('classType');
 
-      // 🔹 Map URL param → backend value
-      this.classType =
-        type === 'class1' ? 'Class 1' : 'Class 2';
+      const classMap: Record<string, 'Class 1' | 'Class 2' | 'Class 3'> = {
+        class1: 'Class 1',
+        class2: 'Class 2',
+        class3: 'Class 3'
+      };
+
+      this.classType = classMap[type || ''] || 'Class 1';
 
       this.loadMedical();
     });
@@ -49,16 +55,20 @@ export class MedicalsComponent {
     this.medicalService.getAll().subscribe({
       next: (res) => {
         this.medical = res.find(m => m.classType === this.classType);
+        this.safePdfUrl = undefined;
+        this.showPreview = false;
         if (this.medical?.documentUrl) {
           this.safePdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
             `${this.uploadBaseUrl}${this.medical.documentUrl}`
           );
         }
         this.loading = false;
+        this.cdr.markForCheck();
       },
       error: () => {
         this.message = 'Error loading medical';
         this.loading = false;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -142,11 +152,13 @@ export class MedicalsComponent {
         this.showForm = false;
         this.selectedFile = undefined;
         this.isSaving = false;
+        this.cdr.markForCheck();
         this.loadMedical();
       },
       error: (err) => {
         this.isSaving = false;
-        this.message = err.error?.message || 'Error saving medical'
+        this.message = err.error?.message || 'Error saving medical';
+        this.cdr.markForCheck();
       }
     });
   }
@@ -195,6 +207,14 @@ export class MedicalsComponent {
 
   quickSetReminder(days: number): void {
     this.form.reminderDays = days;
+  }
+
+  trackByNumber(_: number, value: number): number {
+    return value;
+  }
+
+  trackByHistory(_: number, prev: any): string {
+    return `${prev.classType || ''}-${prev.issueDate || ''}-${prev.expiryDate || ''}`;
   }
 
   autoFillExpiryFromIssue(): void {

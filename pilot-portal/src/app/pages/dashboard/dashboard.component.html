@@ -32,6 +32,34 @@
     </div>
   </div>
 
+  <!-- AI CO-PILOT BRIEFING -->
+  <div class="ai-briefing-card glass rounded-2xl shadow-xl p-6 border border-white/20">
+    <div class="flex items-start gap-4">
+      <div class="ai-avatar flex-shrink-0">🤖</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-semibold uppercase tracking-widest mb-1 ai-label">AI Co-Pilot · Daily Briefing</p>
+        <p class="text-base font-medium leading-snug mb-5 ai-greeting">{{ aiGreeting }}</p>
+
+        <div *ngIf="todayChecklist.length" class="space-y-2">
+          <div
+            *ngFor="let item of todayChecklist; trackBy: trackByAction"
+            class="checklist-item"
+            [ngClass]="item.priority"
+          >
+            <span class="ci-icon">{{ item.icon }}</span>
+            <div class="ci-body">
+              <span class="ci-action">{{ item.action }}</span>
+              <span class="ci-detail">{{ item.detail }}</span>
+            </div>
+            <span class="ci-badge">{{ item.priority === 'urgent' ? 'Urgent' : item.priority === 'soon' ? 'Soon' : 'Info' }}</span>
+          </div>
+        </div>
+
+        <div *ngIf="loading" class="text-sm ai-loading mt-2">Analysing your pilot profile…</div>
+      </div>
+    </div>
+  </div>
+
   <!-- PILOT SUMMARY -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
     <!-- PROFILE -->
@@ -486,7 +514,7 @@
 
         <tbody class="text-slate-700 dark:text-slate-300">
           <tr
-            *ngFor="let med of medicalStatus"
+            *ngFor="let med of medicalStatus; trackBy: trackById"
             class="border-b border-slate-200/30 dark:border-slate-700/30 hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors"
           >
             <td class="py-4 font-medium">{{ med.classLabel }}</td>
@@ -549,7 +577,7 @@
 
         <tbody class="text-slate-700 dark:text-slate-300">
           <tr
-            *ngFor="let lic of licenseAlerts"
+            *ngFor="let lic of licenseAlerts; trackBy: trackById"
             class="border-b border-slate-200/30 dark:border-slate-700/30 hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors"
           >
             <td class="py-4 font-medium">{{ lic.license }}</td>
@@ -607,7 +635,7 @@
 
       <tbody class="text-slate-700 dark:text-slate-300">
         <tr
-          *ngFor="let log of logbookSummary"
+          *ngFor="let log of logbookSummary; trackBy: trackById"
           class="border-b border-slate-200 dark:border-gray-800"
         >
           <td class="py-3">{{ log.date | date }}</td>

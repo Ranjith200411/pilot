@@ -7,7 +7,9 @@
         {{
           classType === "Class 1"
             ? "Commercial readiness monitoring with high-priority renewal windows."
-            : "Private operations readiness with proactive expiry and limitation tracking."
+            : classType === "Class 2"
+            ? "Private operations readiness with proactive expiry and limitation tracking."
+            : "Recreational operations readiness with core validity and renewal tracking."
         }}
       </p>
 
@@ -118,7 +120,7 @@
         class="history-wrap"
       >
         <h5>Medical History</h5>
-        <div class="history-item" *ngFor="let prev of medical.previousMedicals">
+        <div class="history-item" *ngFor="let prev of medical.previousMedicals; trackBy: trackByHistory">
           <div>
             <strong>{{ prev.classType }}</strong>
             <p>{{ prev.issueDate | date }} to {{ prev.expiryDate | date }}</p>
@@ -185,14 +187,14 @@
       <div>
         <label>Reminder Lead Time</label>
         <select [(ngModel)]="form.reminderDays">
-          <option *ngFor="let option of reminderOptions" [ngValue]="option">
+          <option *ngFor="let option of reminderOptions; trackBy: trackByNumber" [ngValue]="option">
             {{ option }} days
           </option>
         </select>
         <div class="chip-row">
           <button
             type="button"
-            *ngFor="let option of [45, 30, 14]"
+            *ngFor="let option of quickReminderOptions; trackBy: trackByNumber"
             (click)="quickSetReminder(option)"
           >
             {{ option }}d

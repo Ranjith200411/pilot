@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef, OnDestroy, OnInit } from '@angular/core';
 import { LogEntry, LogbookService } from 'src/app/services/logbook/logbook.service';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 Chart.register(...registerables);
@@ -7,7 +7,8 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-logbook',
   templateUrl: './logbook.component.html',
-  styleUrls: ['./logbook.component.scss']
+  styleUrls: ['./logbook.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LogbookComponent implements OnInit {
 
@@ -19,10 +20,15 @@ export class LogbookComponent implements OnInit {
   chart!: Chart;
   flightTypeChart!: Chart;
   liveMode = true;
-  refreshIntervalSeconds = 20;
+  refreshIntervalSeconds = 60;
   lastSyncedAt: Date | null = null;
   isRefreshing = false;
   private refreshTimer?: ReturnType<typeof setInterval>;
+
+  // Cached computed properties — updated only when data loads
+  averageHoursPerFlight = 0;
+  topAircraft = 'N/A';
+  logbookInsights: { type: 'warning' | 'info' | 'success'; icon: string; title: string; detail: string }[] = [];
 
   aircraftSummary: {
     aircraft: string;
@@ -56,7 +62,7 @@ export class LogbookComponent implements OnInit {
   editingId: string | null = null;
   message = '';
 
-  constructor(private logbookService: LogbookService) {}
+  constructor(private logbookService: LogbookService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
     this.loadLogbook();
@@ -98,14 +104,17 @@ export class LogbookComponent implements OnInit {
           : null;
   
         this.calculateAircraftSummary();
+        this.computeInsights();
         this.renderMonthlyChart();
         this.renderFlightTypeChart();
         this.lastSyncedAt = new Date();
         this.isRefreshing = false;
+        this.cdr.markForCheck();
       },
       error: () => {
         this.message = 'Error loading logbook!';
         this.isRefreshing = false;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -399,22 +408,125 @@ export class LogbookComponent implements OnInit {
     this.editingId = null;
   }
 
-  get averageHoursPerFlight(): number {
-    if (!this.totalFlights) {
-      return 0;
+  private computeInsights(): void {
+    // averageHoursPerFlight
+    this.averageHoursPerFlight = this.totalFlights > 0
+      ? Number((this.totalHours / this.totalFlights).toFixed(1))
+      : 0;
+
+    // topAircraft
+    if (this.aircraftSummary.length > 0) {
+      const sorted = [...this.aircraftSummary].sort((a, b) => b.hours - a.hours);
+      this.topAircraft = sorted[0].aircraft;
+    } else {
+      this.topAircraft = 'N/A';
     }
 
-    return Number((this.totalHours / this.totalFlights).toFixed(1));
-  }
+    // logbookInsights
+    const _self = this;
+    function buildInsights(): { type: 'warning' | 'info' | 'success'; icon: string; title: string; detail: string }[] {
+    const insights: { type: 'warning' | 'info' | 'success'; icon: string; title: string; detail: string }[] = [];
+    const now = Date.now();
+    const day = 86400000;
 
-  get topAircraft(): string {
-    if (!this.aircraftSummary.length) {
-      return 'N/A';
+    // Night currency: 3 night landings in last 90 days
+    const nightCutoff = now - 90 * day;
+    const recentNightLandings = _self.logbook
+      .filter(l => new Date(l.date).getTime() > nightCutoff)
+      .reduce((sum, l) => sum + (Number(l.nightLandings) || 0), 0);
+    if (recentNightLandings < 3 && _self.totalFlights > 0) {
+      insights.push({
+        type: 'warning', icon: '🌙',
+        title: 'Low Night Currency',
+        detail: `${recentNightLandings}/3 night landings in last 90 days. Log more night ops to stay current.`
+      });
     }
 
-    const sorted = [...this.aircraftSummary].sort((a, b) => b.hours - a.hours);
-    return sorted[0].aircraft;
+    // Instrument currency: 6 approaches in last 6 months
+    const ifrCutoff = now - 180 * day;
+    const recentApproaches = _self.logbook
+      .filter(l => new Date(l.date).getTime() > ifrCutoff)
+      .reduce((sum, l) => sum + (Number(l.instrumentActual) || 0) + (Number(l.instrumentSimulated) || 0), 0);
+    if (recentApproaches < 6) {
+      insights.push({
+        type: 'warning', icon: '🎯',
+        title: 'Instrument Currency Risk',
+        detail: `${recentApproaches}/6 instrument approaches in last 6 months. IFR currency requires 6 approaches + holds.`
+      });
+    }
+
+    // Route diversity
+    const routes = _self.logbook
+      .filter(l => l.departureAirport && l.arrivalAirport)
+      .map(l => `${l.departureAirport?.toUpperCase()}-${l.arrivalAirport?.toUpperCase()}`);
+    if (routes.length >= 5) {
+      const uniqueRoutes = new Set(routes).size;
+      if (uniqueRoutes <= 2) {
+        insights.push({
+          type: 'info', icon: '🗺️',
+          title: 'Low Route Diversity',
+          detail: `Only ${uniqueRoutes} unique route${uniqueRoutes > 1 ? 's' : ''} across ${routes.length} logged flights. Cross-country variety builds navigation proficiency.`
+        });
+      }
+    }
+
+    // Dual instruction gap
+    const trainingCutoff = now - 90 * day;
+    const recentDual = _self.logbook
+      .filter(l => new Date(l.date).getTime() > trainingCutoff)
+      .reduce((sum, l) => sum + (Number(l.dualReceived) || 0), 0);
+    if (_self.totalFlights > 5 && recentDual === 0) {
+      insights.push({
+        type: 'info', icon: '👨‍🏫',
+        title: 'No Recent Dual Instruction',
+        detail: 'No dual-received time in the last 90 days. A training session can sharpen skills and support BFR prep.'
+      });
+    }
+
+    // Extended inactivity
+    if (_self.logbook.length > 0) {
+      const lastDate = new Date(_self.logbook.map(l => l.date).sort().reverse()[0]);
+      const daysSince = Math.floor((now - lastDate.getTime()) / day);
+      if (daysSince > 45) {
+        insights.push({
+          type: 'warning', icon: '⏰',
+          title: 'Extended Inactivity',
+          detail: `${daysSince} days since last logged flight. Currency requirements may be at risk.`
+        });
+      }
+    }
+
+    // Positive trend detection
+    if (_self.logbook.length >= 6) {
+      const sorted = [..._self.logbook].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const half = Math.floor(sorted.length / 2);
+      const recentHrs = sorted.slice(0, half).reduce((s, l) => s + Number(l.totalTime || l.hours || 0), 0);
+      const olderHrs  = sorted.slice(half).reduce((s, l) => s + Number(l.totalTime || l.hours || 0), 0);
+      if (olderHrs > 0 && recentHrs > olderHrs * 1.2) {
+        insights.push({
+          type: 'success', icon: '📈',
+          title: 'Flight Hours Trending Up',
+          detail: 'Your recent flying rate is 20%+ above your earlier average. Keep it up!'
+        });
+      }
+    }
+
+    if (insights.length === 0 && _self.totalFlights > 0) {
+      insights.push({
+        type: 'success', icon: '✅',
+        title: 'All Currencies Look Good',
+        detail: 'No critical gaps detected. Night, instrument, and route activity are on track.'
+      });
+    }
+
+    return insights;
+    }
+    this.logbookInsights = buildInsights();
   }
+
+  trackByLogId(_: number, l: LogEntry): string { return l._id || String(_); }
+  trackByAircraft(_: number, a: any): string { return a.aircraft; }
+  trackByTitle(_: number, i: any): string { return i.title; }
 
   private normalizeFlightType(type?: string): 'Training' | 'Solo' | 'Personal' | 'Commercial' | 'Other' {
     const normalized = (type || '').toLowerCase();

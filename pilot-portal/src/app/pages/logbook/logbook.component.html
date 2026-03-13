@@ -126,6 +126,38 @@
     </div>
   </div>
 
+  <!-- INTELLIGENCE REPORT -->
+  <div class="log-intel-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-5">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="intel-icon">🧠</div>
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-widest intel-label">Logbook Intelligence</p>
+        <p class="text-sm intel-sub">Auto-detected trends &amp; currency insights</p>
+      </div>
+    </div>
+
+    <div *ngIf="logbook.length === 0" class="text-sm text-center py-4" style="color:var(--log-muted)">
+      Log flights to unlock intelligence insights.
+    </div>
+
+    <div *ngIf="logbook.length > 0" class="space-y-2">
+      <div
+        *ngFor="let ins of logbookInsights; trackBy: trackByTitle"
+        class="intel-item"
+        [ngClass]="ins.type"
+      >
+        <span class="intel-item-icon">{{ ins.icon }}</span>
+        <div class="intel-item-body">
+          <span class="intel-item-title">{{ ins.title }}</span>
+          <span class="intel-item-detail">{{ ins.detail }}</span>
+        </div>
+        <span class="intel-item-badge">
+          {{ ins.type === 'warning' ? '⚠ Action' : ins.type === 'success' ? '✓ Good' : 'ℹ Info' }}
+        </span>
+      </div>
+    </div>
+  </div>
+
   <!-- SUMMARY -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <!-- AIRCRAFT SUMMARY -->
@@ -147,7 +179,7 @@
 
         <tbody>
           <tr
-            *ngFor="let a of aircraftSummary"
+            *ngFor="let a of aircraftSummary; trackBy: trackByAircraft"
             class="border-t border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
           >
             <td class="p-3 font-medium">{{ a.aircraft }}</td>
@@ -551,7 +583,7 @@
 
       <tbody>
         <tr
-          *ngFor="let log of logbook"
+          *ngFor="let log of logbook; trackBy: trackByLogId"
           class="border-t border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
         >
           <td class="p-3">{{ log.date | date: "yyyy-MM-dd" }}</td>

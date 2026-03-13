@@ -217,3 +217,143 @@
 	background: var(--chart-badge-bg);
 	color: var(--chart-badge-text);
 }
+
+/* ── Intelligence panel ──────────────────────── */
+:host {
+	--intel-label: #0369a1;
+	--intel-sub: #475569;
+	--intel-icon-bg: rgba(14, 165, 233, 0.1);
+	--intel-icon-border: rgba(14, 165, 233, 0.25);
+
+	--intel-warn-bg: rgba(245, 158, 11, 0.07);
+	--intel-warn-border: rgba(245, 158, 11, 0.35);
+	--intel-warn-badge: #92400e;
+	--intel-warn-badge-bg: rgba(245, 158, 11, 0.13);
+
+	--intel-success-bg: rgba(16, 185, 129, 0.07);
+	--intel-success-border: rgba(16, 185, 129, 0.3);
+	--intel-success-badge: #065f46;
+	--intel-success-badge-bg: rgba(16, 185, 129, 0.12);
+
+	--intel-info-bg: rgba(14, 165, 233, 0.06);
+	--intel-info-border: rgba(14, 165, 233, 0.2);
+	--intel-info-badge: #0369a1;
+	--intel-info-badge-bg: rgba(14, 165, 233, 0.1);
+}
+
+:host-context(.dark) {
+	--intel-label: #38bdf8;
+	--intel-sub: #94a3b8;
+	--intel-icon-bg: rgba(56, 189, 248, 0.12);
+	--intel-icon-border: rgba(56, 189, 248, 0.28);
+
+	--intel-warn-bg: rgba(245, 158, 11, 0.1);
+	--intel-warn-border: rgba(245, 158, 11, 0.4);
+	--intel-warn-badge: #fcd34d;
+	--intel-warn-badge-bg: rgba(245, 158, 11, 0.18);
+
+	--intel-success-bg: rgba(16, 185, 129, 0.1);
+	--intel-success-border: rgba(16, 185, 129, 0.35);
+	--intel-success-badge: #6ee7b7;
+	--intel-success-badge-bg: rgba(16, 185, 129, 0.18);
+
+	--intel-info-bg: rgba(14, 165, 233, 0.08);
+	--intel-info-border: rgba(56, 189, 248, 0.25);
+	--intel-info-badge: #7dd3fc;
+	--intel-info-badge-bg: rgba(14, 165, 233, 0.15);
+}
+
+.logbook-shell .log-intel-card {
+	background: var(--log-card-bg) !important;
+	border-color: var(--log-card-border) !important;
+}
+
+.logbook-shell .intel-icon {
+	width: 2.6rem;
+	height: 2.6rem;
+	font-size: 1.35rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.75rem;
+	background: var(--intel-icon-bg);
+	border: 1px solid var(--intel-icon-border);
+	flex-shrink: 0;
+}
+
+.logbook-shell .intel-label { color: var(--intel-label); }
+.logbook-shell .intel-sub   { color: var(--intel-sub); font-size: 0.8rem; margin-top: 0.1rem; }
+
+.logbook-shell .intel-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.7rem;
+	padding: 0.65rem 0.85rem;
+	border-radius: 0.6rem;
+	border-left: 3px solid transparent;
+}
+
+.logbook-shell .intel-item.warning {
+	background: var(--intel-warn-bg);
+	border-left-color: var(--intel-warn-badge);
+}
+
+.logbook-shell .intel-item.success {
+	background: var(--intel-success-bg);
+	border-left-color: var(--intel-success-badge);
+}
+
+.logbook-shell .intel-item.info {
+	background: var(--intel-info-bg);
+	border-left-color: var(--intel-info-badge);
+}
+
+.logbook-shell .intel-item-icon {
+	font-size: 1rem;
+	flex-shrink: 0;
+	margin-top: 0.1rem;
+}
+
+.logbook-shell .intel-item-body {
+	flex: 1;
+	min-width: 0;
+}
+
+.logbook-shell .intel-item-title {
+	display: block;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--log-text);
+}
+
+.logbook-shell .intel-item-detail {
+	display: block;
+	font-size: 0.78rem;
+	color: var(--log-muted);
+	margin-top: 0.1rem;
+}
+
+.logbook-shell .intel-item-badge {
+	flex-shrink: 0;
+	font-size: 0.68rem;
+	font-weight: 700;
+	padding: 0.18rem 0.5rem;
+	border-radius: 999px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.logbook-shell .intel-item.warning .intel-item-badge {
+	background: var(--intel-warn-badge-bg);
+	color: var(--intel-warn-badge);
+}
+
+.logbook-shell .intel-item.success .intel-item-badge {
+	background: var(--intel-success-badge-bg);
+	color: var(--intel-success-badge);
+}
+
+.logbook-shell .intel-item.info .intel-item-badge {
+	background: var(--intel-info-badge-bg);
+	color: var(--intel-info-badge);
+}

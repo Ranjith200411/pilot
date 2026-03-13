@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, HostListener, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from 'src/app/services/auth/auth.service';
 import { UserService } from 'src/app/services/user/user.service';
@@ -7,7 +7,8 @@ import { ToastService } from 'src/app/services/toast/toast.service';
 
 @Component({
   selector: 'app-header',
-  templateUrl: './header.component.html'
+  templateUrl: './header.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HeaderComponent implements OnInit {
 
@@ -29,7 +30,8 @@ export class HeaderComponent implements OnInit {
     private userService: UserService,
     private router: Router,
     private themeService: ThemeService,
-    private toast: ToastService
+    private toast: ToastService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -37,12 +39,14 @@ export class HeaderComponent implements OnInit {
       next: (res: any) => {
         this.user = res;
         this.initials = this.getInitials(res.name);
+        this.cdr.markForCheck();
       }
     });
 
     // Subscribe to theme changes
     this.themeService.darkMode$.subscribe(isDark => {
       this.isDarkMode = isDark;
+      this.cdr.markForCheck();
     });
   }
 
@@ -83,10 +87,12 @@ export class HeaderComponent implements OnInit {
   }
 
   markAllAsRead() {
-    const unreadCount = this.unreadCount;
-    this.notifications.forEach(n => n.read = true);
-    if (unreadCount > 0) {
-      this.toast.success(`${unreadCount} notifications marked as read`, 2000);
+    const total = this.notifications.length;
+    this.notifications = [];
+    this.notificationOpen = false;
+    this.showAllNotifications = false;
+    if (total > 0) {
+      this.toast.success(`All ${total} notifications cleared`, 2000);
     }
   }
 
@@ -94,6 +100,8 @@ export class HeaderComponent implements OnInit {
     this.notifications = this.notifications.filter(n => n.id !== notificationId);
     this.toast.info('Notification cleared', 2000);
   }
+
+  trackByNotifId(_: number, n: any): number { return n.id; }
 
   get unreadCount() {
     return this.notifications.filter(n => !n.read).length;
