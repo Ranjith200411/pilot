@@ -90,30 +90,7 @@ export class LogbookComponent implements OnInit {
     this.logbookService.getAll().subscribe({
       next: (res) => {
         this.logbook = res || [];
-        const nextSignature = this.buildChartSignature(this.logbook);
-        const shouldRenderCharts = nextSignature !== this.lastChartSignature;
-  
-        this.totalFlights = this.logbook.length;
-        this.totalHours = this.logbook.reduce(
-          (sum, l) => sum + (Number(l.totalTime || l.hours) || 0),
-          0
-        );
-  
-        this.lastFlightDate = this.logbook.length
-          ? this.logbook
-              .map(l => l.date)
-              .sort()
-              .reverse()[0]
-          : null;
-  
-        this.calculateAircraftSummary();
-        this.computeInsights();
-        if (shouldRenderCharts) {
-          this.renderMonthlyChart();
-          this.renderFlightTypeChart();
-          this.lastChartSignature = nextSignature;
-        }
-        this.lastSyncedAt = new Date();
+        this.refreshDerivedData();
         this.isRefreshing = false;
         this.cdr.markForCheck();
       },
@@ -123,6 +100,35 @@ export class LogbookComponent implements OnInit {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  private refreshDerivedData() {
+    const nextSignature = this.buildChartSignature(this.logbook);
+    const shouldRenderCharts = nextSignature !== this.lastChartSignature;
+
+    this.totalFlights = this.logbook.length;
+    this.totalHours = this.logbook.reduce(
+      (sum, l) => sum + (Number(l.totalTime || l.hours) || 0),
+      0
+    );
+
+    this.lastFlightDate = this.logbook.length
+      ? this.logbook
+          .map(l => l.date)
+          .sort()
+          .reverse()[0]
+      : null;
+
+    this.calculateAircraftSummary();
+    this.computeInsights();
+
+    if (shouldRenderCharts) {
+      this.renderMonthlyChart();
+      this.renderFlightTypeChart();
+      this.lastChartSignature = nextSignature;
+    }
+
+    this.lastSyncedAt = new Date();
   }
 
   startLiveSync() {
@@ -371,20 +377,33 @@ export class LogbookComponent implements OnInit {
     if (!this.editingId) {
       // CREATE
       this.logbookService.create(body).subscribe({
-        next: () => {
+        next: (created) => {
           this.message = 'Entry added!';
           this.resetForm();
-          this.loadLogbook();
+
+          // Update local view immediately to avoid stale UI if the list is cached.
+          this.logbook = [created, ...this.logbook];
+          this.refreshDerivedData();
+          this.cdr.markForCheck();
         },
         error: () => this.message = 'Error adding entry!'
       });
     } else {
       // UPDATE
       this.logbookService.update(this.editingId, body).subscribe({
-        next: () => {
+        next: (updated) => {
           this.message = 'Entry updated!';
           this.resetForm();
-          this.loadLogbook();
+
+          const idx = this.logbook.findIndex(l => l._id === this.editingId);
+          if (idx >= 0) {
+            this.logbook[idx] = updated;
+            this.refreshDerivedData();
+            this.cdr.markForCheck();
+          } else {
+            // Fallback: reload if the updated entry is not in local cache
+            this.loadLogbook();
+          }
         },
         error: () => this.message = 'Error updating entry!'
       });

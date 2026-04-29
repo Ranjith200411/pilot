@@ -20,6 +20,45 @@ function Invoke-ApiJson {
     return Invoke-RestMethod -Method $Method -Uri $Url -Headers $Headers -Body ($Body | ConvertTo-Json -Depth 10)
 }
 
+function Invoke-ApiMultipart {
+    param(
+        [string]$Url,
+        [hashtable]$Headers,
+        [hashtable]$Form
+    )
+
+    # Ensure required .NET types are loaded (PowerShell 5 compatibility)
+    Add-Type -AssemblyName System.Net.Http
+
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    $client = New-Object System.Net.Http.HttpClient($handler)
+
+    foreach ($key in $Headers.Keys) {
+        if ($key -ieq 'Content-Type') { continue }
+        $client.DefaultRequestHeaders.Add($key, $Headers[$key])
+    }
+
+    $multipart = New-Object System.Net.Http.MultipartFormDataContent
+
+    foreach ($fieldKey in $Form.Keys) {
+        $value = $Form[$fieldKey]
+
+        if ($value -is [System.IO.FileInfo]) {
+            $fileStream = $value.OpenRead()
+            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+            $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("application/pdf")
+            $multipart.Add($fileContent, $fieldKey, $value.Name)
+        } else {
+            $stringContent = New-Object System.Net.Http.StringContent($value.ToString())
+            $multipart.Add($stringContent, $fieldKey)
+        }
+    }
+
+    $response = $client.PostAsync($Url, $multipart).Result
+    $response.EnsureSuccessStatusCode()
+    $response.Content.ReadAsStringAsync().Result | ConvertFrom-Json
+}
+
 Write-Host "Starting sample data population..."
 
 # 1) Register (ignore if already exists)
@@ -103,19 +142,59 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pdfClass1 = Join-Path $root "sample-documents\\sample-class1-medical.pdf"
 $pdfClass2 = Join-Path $root "sample-documents\\sample-class2-medical.pdf"
 
-curl.exe -s -X POST "$apiBase/medicals" -H "Authorization: Bearer $($login.token)" -F "classType=Class 1" -F "issueDate=2025-02-15" -F "expiryDate=2026-12-31" -F "examinerName=Dr. Alice Romero" -F "examinerNumber=AME-4421" -F "examinationDate=2025-02-15" -F "restrictions=Must wear corrective lenses" -F "limitations=None" -F "reminderDays=45" -F "remarks=Annual Class 1 completed" -F "document=@$pdfClass1" | Out-Null
-curl.exe -s -X POST "$apiBase/medicals" -H "Authorization: Bearer $($login.token)" -F "classType=Class 2" -F "issueDate=2025-06-10" -F "expiryDate=2027-06-09" -F "examinerName=Dr. Martin Shah" -F "examinerNumber=AME-1029" -F "examinationDate=2025-06-10" -F "restrictions=None" -F "limitations=None" -F "reminderDays=60" -F "remarks=Class 2 backup medical" -F "document=@$pdfClass2" | Out-Null
-curl.exe -s -X POST "$apiBase/medicals" -H "Authorization: Bearer $($login.token)" -F "classType=Class 3" -F "issueDate=2025-09-01" -F "expiryDate=2028-08-31" -F "examinerName=Dr. Kevin Ross" -F "examinerNumber=AME-5590" -F "examinationDate=2025-09-01" -F "restrictions=None" -F "limitations=Day VFR operations preferred" -F "reminderDays=90" -F "remarks=Class 3 maintained for personal/recreational ops" -F "document=@$pdfClass2" | Out-Null
+$medicals = @(
+    @{ classType="Class 1"; issueDate="2025-02-15"; expiryDate="2026-12-31"; examinerName="Dr. Alice Romero"; examinerNumber="AME-4421"; examinationDate="2025-02-15"; restrictions="Must wear corrective lenses"; limitations="None"; reminderDays=45; remarks="Annual Class 1 completed"; document=$pdfClass1 },
+    @{ classType="Class 2"; issueDate="2025-06-10"; expiryDate="2027-06-09"; examinerName="Dr. Martin Shah"; examinerNumber="AME-1029"; examinationDate="2025-06-10"; restrictions="None"; limitations="None"; reminderDays=60; remarks="Class 2 backup medical"; document=$pdfClass2 },
+    @{ classType="Class 3"; issueDate="2025-09-01"; expiryDate="2028-08-31"; examinerName="Dr. Kevin Ross"; examinerNumber="AME-5590"; examinationDate="2025-09-01"; restrictions="None"; limitations="Day VFR operations preferred"; reminderDays=90; remarks="Class 3 maintained for personal/recreational ops"; document=$pdfClass2 }
+)
+
+foreach ($m in $medicals) {
+    $form = @{
+        classType = $m.classType
+        issueDate = $m.issueDate
+        expiryDate = $m.expiryDate
+        examinerName = $m.examinerName
+        examinerNumber = $m.examinerNumber
+        examinationDate = $m.examinationDate
+        restrictions = $m.restrictions
+        limitations = $m.limitations
+        reminderDays = $m.reminderDays
+        remarks = $m.remarks
+    }
+    $formWithFile = $form.Clone()
+    $formWithFile.document = Get-Item $m.document
+    Invoke-ApiMultipart -Url "$apiBase/medicals" -Headers $authHeaders -Form $formWithFile | Out-Null
+}
 
 Write-Host "Inserted medical records."
 
 # 7) Seed licenses with PDFs
-$pdfSpl = Join-Path $root "sample-documents\\sample-spl-license.pdf"
-$pdfCpl = Join-Path $root "sample-documents\\sample-cpl-license.pdf"
+$pdfSpl = Join-Path $root "sample-documents\sample-spl-license.pdf"
+$pdfCpl = Join-Path $root "sample-documents\sample-cpl-license.pdf"
 
-curl.exe -s -X POST "$apiBase/license" -H "Authorization: Bearer $($login.token)" -F "type=SPL" -F "licenseNumber=SPL-342178" -F "issueDate=2023-03-11" -F "expiryDate=2028-03-11" -F "restrictions=Student solo with instructor endorsement" -F "remarks=Initial student license" -F "document=@$pdfSpl" | Out-Null
-curl.exe -s -X POST "$apiBase/license" -H "Authorization: Bearer $($login.token)" -F "type=PPL" -F "licenseNumber=PPL-981442" -F "issueDate=2024-08-02" -F "expiryDate=2029-08-02" -F "restrictions=Corrective lenses" -F "remarks=Private pilot privileges" -F "document=@$pdfCpl" | Out-Null
-curl.exe -s -X POST "$apiBase/license" -H "Authorization: Bearer $($login.token)" -F "type=CPL" -F "licenseNumber=CPL-557731" -F "issueDate=2025-01-20" -F "expiryDate=2030-01-20" -F "restrictions=None" -F "remarks=Commercial multi-engine" -F "document=@$pdfCpl" | Out-Null
+$licenses = @(
+    @{ type="SPL"; licenseNumber="SPL-342178"; issueDate="2023-03-11"; expiryDate="2028-03-11"; restrictions="Student solo with instructor endorsement"; remarks="Initial student license" },
+    @{ type="PPL"; licenseNumber="PPL-981442"; issueDate="2024-08-02"; expiryDate="2029-08-02"; restrictions="Corrective lenses"; remarks="Private pilot privileges" },
+    @{ type="CPL"; licenseNumber="CPL-557731"; issueDate="2025-01-20"; expiryDate="2030-01-20"; restrictions="None"; remarks="Commercial multi-engine" }
+)
+
+foreach ($l in $licenses) {
+    $form = @{
+        type = $l.type
+        licenseNumber = $l.licenseNumber
+        issueDate = $l.issueDate
+        expiryDate = $l.expiryDate
+        restrictions = $l.restrictions
+        remarks = $l.remarks
+    }
+
+    $docPath = if ($l.type -eq 'SPL') { $pdfSpl } else { $pdfCpl }
+
+    $formWithFile = $form.Clone()
+    $formWithFile.document = Get-Item $docPath
+
+    Invoke-ApiMultipart -Url "$apiBase/license" -Headers $authHeaders -Form $formWithFile | Out-Null
+}
 
 # 8) Add ratings and endorsements
 $licenses = Invoke-ApiJson -Method "Get" -Url "$apiBase/license" -Headers $authHeaders
